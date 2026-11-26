@@ -1,3 +1,68 @@
+> **本机实测配置（zhuchiheng）** —— 下面这段是本机（Windows + Radeon RX 7900 XTX 外接、HIP SDK 6.4）
+> 在 2026-11-26 的实测结论，其余部分为上游原文。改动仅在 README，源码未作任何修改。
+>
+> ## 构建
+>
+> ```bat
+> set GPU_TARGETS=gfx1100
+> scripts\inkling2-amd\build-hip.cmd build-hip
+> ```
+>
+> HIP SDK 6.4（上游按 7.2 测的），约 9 分钟。产物在 `build-hip\bin`。
+>
+> ## 用的文件
+>
+> | 用途 | 文件 | 字节 | gguf arch |
+> |---|---|---|---|
+> | 模型 | `Inkling-2-Mini-UD-Q4_K_XL-old.gguf`（unsloth/Inkling-2-Mini-GGUF 的 `Old_Support/`） | 17,629,759,456 | `inkling2` |
+> | drafter | `dspark-Inkling-2-Mini-Q8_0_Old.gguf` | 402,278,560 | `dflash` |
+>
+> ## 算力基线（`llama-bench`）
+>
+> ```bat
+> build-hip\bin\llama-bench.exe -m <model> -dev ROCm0 -ngl 99 -fa 1 -p 512,2048 -n 128 -r 2
+> ```
+>
+> pp512 **3308.55** / pp2048 **3289.28** / tg128 **92.53** tok/s。
+>
+> ## 本机最佳配置：131.27 tok/s
+>
+> 单 slot，源码 prompt 读一遍后生成 300 token。writing 随**接受率**大幅波动，引用时请连接受率一起写。
+>
+> | ctx | KV | prompt token | reading | **writing** | 接受率 | token/step |
+> |---|---|---|---|---|---|---|
+> | 32768 | f16 | 5,281 | 2314.2 | 119.09 | 58.5% | 2.74 |
+> | **65536** | **f16** | **56,058** | **2746.0** | **131.27** | **92.0%** | **3.74** |
+> | 131072 | q8 | 129,804 | 2061.5 | 93.98 | 69.1% | 3.07 |
+> | 262144 | q8 K / q4 V | 231,011 | 1234.2 | 75.87 | 81.9% | 3.44 |
+>
+> 峰值那条（131.27 tok/s）的命令行：
+>
+> ```bat
+> llama-server -m <model> -dev ROCm0 -ngl 99 -fa 1 -c 65536 -np 1 -b 2048 -ub 1024 --jinja ^
+>   -md <drafter> -ngld 99 --spec-type draft-dspark --spec-draft-n-max 3 --spec-draft-n-ubatch 512 ^
+>   --backend-sampling --temp 1.0 --top-p 1.0 --top-k 0 --min-p 0.0 --host 127.0.0.1 --port 8080
+> ```
+>
+> - 131072 档：加上 `-ctk q8_0 -ctv q8_0`，`--spec-draft-n-ubatch` 改 256
+> - 262144 档：`-ctk q8_0 -ctv q4_0`，并设 `INKLING2_DRAFT_KV_WINDOW=32768 INKLING2_FAR_Q8_HEADS=2`
+>
+> 不开 drafter 时是 92.5 tok/s（llama-bench）/ 89.35（server，5281 prompt）。
+> **100+ 全部来自 DSpark drafter**，不是无 draft 的底子。
+>
+> ## 本机踩过的坑
+>
+> 1. **必须 `-dev ROCm0`**。这台机器的 Ryzen 780M 核显也被枚举成第二个设备，不钉死会把层摊到核显上。
+> 2. **别用 Vulkan 后端**。同一份代码编 Vulkan 版只有 **13.0 tok/s**（比 HIP 慢 7 倍、比 prefill 方向上的其他引擎差 9 倍），
+>    因为 banded flash attention 和 NVFP4 WMMA 只在 HIP/CUDA 路径上。用 `scripts\inkling2-amd\build-hip.cmd`。
+> 3. **只认老架构名 `inkling2` 的 GGUF**。`inkling2_loop` 的新文件会报
+>    `unknown model architecture: 'inkling2_loop'`，必须用 `Old_Support/` 那批。
+> 4. **外接卡掉线**。Windows 报 Code 45（`CM_PROB_PHANTOM`）时显卡从总线消失，重新插拔扩展坞即可；
+>    重插后设备枚举顺序可能变，用 `--list-devices` 或 `rocminfo` 确认再跑。
+> 5. `writing` 与接受率强相关（58.5% → 119、92.0% → 131、69.1% → 94），只报 tok/s 会被误读。
+
+---
+
 # Inkling 2 Mini on AMD Radeon (ROCm/HIP): about 3000 tok/s prompt reading and 110 tok/s writing on a 24 GB card
 
 Branch `inkling2-amd`. Measured on Radeon RX 7900 XTX, the first three rows with the h6-lbf16 file (details and method in
