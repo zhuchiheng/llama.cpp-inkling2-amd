@@ -47,6 +47,20 @@
 > - 131072 档：加上 `-ctk q8_0 -ctv q8_0`，`--spec-draft-n-ubatch` 改 256
 > - 262144 档：`-ctk q8_0 -ctv q4_0`，并设 `INKLING2_DRAFT_KV_WINDOW=32768 INKLING2_FAR_Q8_HEADS=2`
 >
+> ## 一键启动 / 一键关闭
+>
+> 上面的命令行已经封装好，用法：
+>
+> ```bat
+> scripts\inkling2-amd\start.bat                  :: 默认 ctx 65536，端口 8080
+> scripts\inkling2-amd\start.bat 131072 8081      :: 换上下文和端口
+> scripts\inkling2-amd\stop.bat                   :: 关闭
+> ```
+>
+> `start.bat` 会先校验二进制、模型、drafter 是否存在，用 `--list-devices` 确认 `ROCm0` 确实是 7900 XTX
+> （外接卡掉线时 `ROCm0` 会变成 780M 核显），检查端口占用，再轮询 `/health` 直到就绪。
+> 日志在 `run\llama-server.err.log`，可用 `INK_MODEL` / `INK_DRAFT` / `INK_CTX` / `INK_PORT` 覆盖默认值。
+>
 > 不开 drafter 时是 92.5 tok/s（llama-bench）/ 89.35（server，5281 prompt）。
 > **100+ 全部来自 DSpark drafter**，不是无 draft 的底子。
 >
