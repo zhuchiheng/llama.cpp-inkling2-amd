@@ -32,15 +32,15 @@
 > | ctx | KV | prompt token | reading | **writing** | 接受率 | token/step |
 > |---|---|---|---|---|---|---|
 > | 32768 | f16 | 5,281 | 2314.2 | 119.09 | 58.5% | 2.74 |
-> | **65536** | **f16** | **56,058** | **2746.0** | **131.27** | **92.0%** | **3.74** |
+> | **32768** | **f16** | **22,676** | — | **136.39** | **66.2%** | — |
 > | 131072 | q8 | 129,804 | 2061.5 | 93.98 | 69.1% | 3.07 |
 > | 262144 | q8 K / q4 V | 231,011 | 1234.2 | 75.87 | 81.9% | 3.44 |
 >
-> 峰值那条（131.27 tok/s）的命令行：
+> 峰值那条（136.39 tok/s）的命令行：
 >
 > ```bat
-> llama-server -m <model> -dev ROCm0 -ngl 99 -fa 1 -c 65536 -np 1 -b 2048 -ub 1024 --jinja ^
->   -md <drafter> -ngld 99 --spec-type draft-dspark --spec-draft-n-max 3 --spec-draft-n-ubatch 512 ^
+> llama-server -m <model> -dev ROCm0 -ngl 99 -fa 1 -c 32768 -np 1 -b 8192 -ub 2048 --jinja ^
+>   -md <drafter> -ngld 99 --spec-type draft-dspark --spec-draft-n-max 5 --spec-draft-n-ubatch 512 ^
 >   --backend-sampling --temp 1.0 --top-p 1.0 --top-k 0 --min-p 0.0 --host 127.0.0.1 --port 8080
 > ```
 >
