@@ -1,7 +1,12 @@
 @echo off
 rem One-line launcher for llama-server: Inkling 2 Mini with the DSpark drafter, in the best configuration measured
-rem on this machine on 2026-11-26 -- 131.27 tok/s writing at context 65536 (56,058-token prompt, 92 % of the drafts
-rem accepted). Same build and the same command line as the README section; only paths, port and context are variables.
+rem on this machine on 2026-11-27 -- 136.39 tok/s writing at a 22,676-token prompt, 66 % of the drafts accepted.
+rem Same build and the same command line as the README section; only paths, port and context are variables.
+rem
+rem The batch sizes and draft count are the measured best for this card, not the defaults: -b 8192 -ub 2048 with five
+rem drafts read 136.39 tok/s against 134.87 for the defaults (-b 2048 -ub 1024, three drafts), with the same 7.4 ms a
+rem token. Do not raise -ub to 8192: its compute buffer is 3000 MiB instead of 355, and a 22k-token prompt then takes
+rem the server down (the fit leaves 15 % of the card free instead of 29 %).
 rem
 rem Usage:  start.bat                  context 65536, port 8080
 rem         start.bat 131072           another context
@@ -69,7 +74,7 @@ if errorlevel 1 (
 rem 1> holds the tokens and the sampling lines, 2> the log of llama.cpp itself (that is where the device and the
 rem draft statistics go). The window is minimised; stop.bat closes it.
 echo starting llama-server -- context %CTX%, port %PORT%
-start "Inkling2 llama-server :%PORT%" /min cmd /c ""%EXE%" -m "%MODEL%" -dev ROCm0 -ngl 99 -fa 1 -c %CTX% -np 1 -b 2048 -ub 1024 --jinja -md "%DRAFT%" -ngld 99 --spec-type draft-dspark --spec-draft-n-max 3 --spec-draft-n-ubatch 512 --backend-sampling --temp 1.0 --top-p 1.0 --top-k 0 --min-p 0.0 --host 127.0.0.1 --port %PORT% 1>"%LOG%" 2>"%ERRLOG%""
+start "Inkling2 llama-server :%PORT%" /min cmd /c ""%EXE%" -m "%MODEL%" -dev ROCm0 -ngl 99 -fa 1 -c %CTX% -np 1 -b 8192 -ub 2048 --jinja -md "%DRAFT%" -ngld 99 --spec-type draft-dspark --spec-draft-n-max 5 --spec-draft-n-ubatch 512 --backend-sampling --temp 1.0 --top-p 1.0 --top-k 0 --min-p 0.0 --host 127.0.0.1 --port %PORT% 1>"%LOG%" 2>"%ERRLOG%""
 
 rem The weights are 16.4 GiB and the drafter 384 MiB: a cold start needs about 30-60 s, so wait up to 240 s.
 set /a TRIES=0
